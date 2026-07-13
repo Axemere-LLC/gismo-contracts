@@ -1,0 +1,10 @@
+# Generated / build output
+dist/
+build/
+
+# OS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
