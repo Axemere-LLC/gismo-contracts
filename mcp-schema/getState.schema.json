@@ -31,13 +31,28 @@
         "hitsTaken": { "type": "integer" }
       }
     },
+    "TerrainView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "type"],
+      "properties": {
+        "x": { "type": "integer" },
+        "y": { "type": "integer" },
+        "type": { "type": "integer", "description": "0=Plain, 1=Forest, 2=Water, 3=Mountain. Only non-Plain cells are ever sent." }
+      }
+    },
     "StateView": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["matchId", "impulse", "ownTanks", "visibleTanks", "blockhouses"],
+      "required": ["matchId", "impulse", "terrain", "ownTanks", "visibleTanks", "blockhouses"],
       "properties": {
         "matchId": { "type": "string" },
         "impulse": { "type": "integer" },
+        "terrain": {
+          "type": "array",
+          "description": "The complete static terrain map, identical for both sides and never Line-of-Sight gated (unlike visibleTanks/blockhouses). Only non-Plain cells are included.",
+          "items": { "$ref": "#/$defs/TerrainView" }
+        },
         "ownTanks": {
           "type": "array",
           "items": { "$ref": "#/$defs/TankView" }
