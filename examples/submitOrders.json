@@ -1,0 +1,13 @@
+{
+  "request": {
+    "matchId": "9f5e5c0a-1b1a-4b1a-9c1a-000000000001",
+    "impulse": 3
+  },
+  "response": {
+    "impulse": 3,
+    "orders": [
+      { "tankId": 1, "speed": 2, "heading": 90, "turretHold": false, "turretHeading": 100, "fire": true, "targetX": 60, "targetY": 44 },
+      { "tankId": 2, "speed": 1, "heading": 45, "turretHold": true, "turretHeading": 45, "fire": false, "targetX": 0, "targetY": 0 }
+    ]
+  }
+}
