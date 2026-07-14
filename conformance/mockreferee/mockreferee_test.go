@@ -15,6 +15,7 @@ import (
 type stateView struct {
 	MatchID      string `json:"matchId"`
 	Impulse      int    `json:"impulse"`
+	Terrain      []any  `json:"terrain"`
 	OwnTanks     []any  `json:"ownTanks"`
 	VisibleTanks []any  `json:"visibleTanks"`
 	Blockhouses  []any  `json:"blockhouses"`

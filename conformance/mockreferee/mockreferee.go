@@ -34,6 +34,7 @@ func Scenario(matchID string, impulse int) []Step {
 			Request: map[string]any{
 				"matchId":      matchID,
 				"impulse":      impulse,
+				"terrain":      []any{},
 				"ownTanks":     []any{},
 				"visibleTanks": []any{},
 				"blockhouses":  []any{},

@@ -22,6 +22,7 @@ func TestRegistry_Validate(t *testing.T) {
 			value: map[string]any{
 				"matchId":      "m1",
 				"impulse":      3,
+				"terrain":      []any{},
 				"ownTanks":     []any{},
 				"visibleTanks": []any{},
 				"blockhouses":  []any{},
@@ -44,6 +45,7 @@ func TestRegistry_Validate(t *testing.T) {
 			value: map[string]any{
 				"matchId":      "m1",
 				"impulse":      3,
+				"terrain":      []any{},
 				"ownTanks":     []any{},
 				"visibleTanks": []any{},
 				"blockhouses":  []any{},
