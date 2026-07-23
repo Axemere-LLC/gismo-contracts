@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+
+      - name: Validate contract + run conformance harness against itself
+        run: go test ./...
+
+      - name: Dependency-pinning self-check
+        run: |
+          if [ ! -f go.sum ]; then
+            echo "go.sum is missing — dependencies are not locked" >&2
+            exit 1
+          fi
+          echo "go.sum present — dependencies locked"
