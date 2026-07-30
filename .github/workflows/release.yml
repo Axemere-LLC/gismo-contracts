@@ -1,12 +1,21 @@
 name: Release
 
-# Inert until the reveal milestone: this repo is private and no tag has been
-# pushed. Do not push a `v*` tag before the reveal decision — see
+# Gated: the "Publish GitHub Release" step only runs when the
+# RELEASE_PUBLISH_ENABLED repo variable is set to "true" AND this isn't a
+# workflow_dispatch dry run. RELEASE_PUBLISH_ENABLED is unset until the
+# reveal decision, so the gate is closed by default — a stray `v*` tag push
+# builds and signs the bundle but stops short of publishing. See
 # gismo-platform/docs/phase-7-supply-chain.md.
 on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run: build and sign, but skip the publish step"
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -30,6 +39,7 @@ jobs:
           subject-path: "dist/gismo-contracts-*.tar.gz"
 
       - name: Publish GitHub Release
+        if: vars.RELEASE_PUBLISH_ENABLED == 'true' && github.event.inputs.dry_run != 'true'
         uses: softprops/action-gh-release@v2
         with:
           files: dist/gismo-contracts-*.tar.gz
