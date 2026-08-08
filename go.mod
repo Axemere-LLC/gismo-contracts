@@ -3,7 +3,7 @@ module github.com/Axemere-LLC/gismo-contracts
 go 1.26
 
 require (
-	github.com/getkin/kin-openapi v0.142.0
+	github.com/getkin/kin-openapi v0.144.0
 	github.com/modelcontextprotocol/go-sdk v1.6.1
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 )
