@@ -814,13 +814,35 @@ components:
         version_label: { type: string }
         competition_eligible: { type: boolean }
         training_grounds_eligible: { type: boolean }
+        mcp_endpoint_url:
+          type: string
+          format: uri
+          description: >
+            The agent version's MCP server endpoint. Absent if none has been
+            registered yet.
         created_at: { type: string, format: date-time }
 
     CreateAgentVersionRequest:
       type: object
-      required: [version_label]
+      required: [version_label, mcp_endpoint_url, mcp_outbound_key]
       properties:
         version_label: { type: string }
+        mcp_endpoint_url:
+          type: string
+          format: uri
+          description: >
+            HTTPS URL of the agent version's MCP server. Must not embed
+            userinfo, and must not resolve to a loopback, private,
+            link-local, or other non-public host.
+        mcp_outbound_key:
+          type: string
+          maxLength: 512
+          writeOnly: true
+          description: >
+            Credential the platform presents to this agent version's MCP
+            endpoint when dialing out to referee a match — the mirror image
+            of the api_key an agent presents when calling in. Write-only:
+            never returned by any response, including this one.
 
     AgentVersionCreated:
       allOf:
@@ -848,6 +870,21 @@ components:
       properties:
         competition_eligible: { type: boolean }
         training_grounds_eligible: { type: boolean }
+        mcp_endpoint_url:
+          type: string
+          format: uri
+          description: >
+            Replaces the registered MCP endpoint if present. Same validation
+            as on create; an empty string is rejected, so this field cannot
+            be used to clear a previously registered endpoint.
+        mcp_outbound_key:
+          type: string
+          maxLength: 512
+          writeOnly: true
+          description: >
+            Replaces the outbound dial credential if present. Same
+            validation as on create; an empty string is rejected, so this
+            field cannot be used to clear a previously registered key.
 
     Match:
       type: object
