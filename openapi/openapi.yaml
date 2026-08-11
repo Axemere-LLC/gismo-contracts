@@ -30,6 +30,24 @@ tags:
   - name: Disputes
 
 paths:
+  /organizations:
+    get:
+      operationId: listOrganizations
+      tags: [Organizations]
+      summary: List every organization the caller belongs to
+      description: >
+        Includes the caller's personal organization. A PAT is confined to the
+        single organization that owns its bound team, regardless of what
+        other organizations the minting user belongs to.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationList"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
   /organizations/{id}:
     get:
       operationId: getOrganization
@@ -46,6 +64,107 @@ paths:
                 $ref: "#/components/schemas/Organization"
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+
+  /organizations/{id}/members:
+    get:
+      operationId: listOrgMembers
+      tags: [Organizations]
+      summary: List an organization's member roster
+      description: >
+        Org Admin/Owner only — the roster is management data, not something
+        every member needs to read. A Personal API Token is never granted
+        this, even when bound to a team owned by the organization.
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrgMemberList"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /organizations/{id}/invitations:
+    get:
+      operationId: listInvitations
+      tags: [Organizations]
+      summary: List an organization's pending invitations
+      description: Org Admin/Owner only.
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PendingInvitationList"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      operationId: sendInvitation
+      tags: [Organizations]
+      summary: Invite a new member to an organization
+      description: >
+        Org Admin/Owner only. role_weight must be 3 (member) or 4 (admin) —
+        an invitation can never mint an owner. Cannot target a personal
+        organization. Sent through Clerk's Backend API; a Clerk-side failure
+        surfaces as 502.
+      parameters:
+        - $ref: "#/components/parameters/id"
+        - $ref: "#/components/parameters/idempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendInvitationRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PendingInvitation"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502":
+          description: Clerk's Invitations API rejected or could not be reached
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /organizations/{id}/invitations/{invitationId}:
+    delete:
+      operationId: revokeInvitation
+      tags: [Organizations]
+      summary: Revoke a pending invitation
+      description: >
+        Org Admin/Owner only. The invitation must still be pending — an
+        already-accepted or already-revoked invitation is a 400.
+      parameters:
+        - $ref: "#/components/parameters/id"
+        - name: invitationId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Revoked }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502":
+          description: Clerk's Invitations API rejected or could not be reached
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
 
   /users/me:
     get:
@@ -336,6 +455,25 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
 
   /agents/{id}/versions:
+    get:
+      operationId: listAgentVersions
+      tags: [Agent Versions]
+      summary: List one agent's versions
+      description: >
+        Team-scoped read — any member of the owning team, or its Lead/org
+        Admin/Owner, may list it. Powers the launch UI's "pick one of my own
+        agent's versions" step.
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentVersionList"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
     post:
       operationId: createAgentVersion
       tags: [Agent Versions]
@@ -360,6 +498,59 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+
+  /teams/{teamId}/agent-versions:
+    get:
+      operationId: listTeamAgentVersions
+      tags: [Agent Versions]
+      summary: List every version across all of a team's agents
+      description: >
+        Team-scoped read — any member of the owning team, or its Lead/org
+        Admin/Owner, may list it. Flattens the agent → version cascade into
+        one listing, powering the launch UI's "Your agent" picker with the
+        same single-dropdown shape listTrainingGroundsVersions gives the
+        opponent picker.
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamAgentVersionList"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /agent-versions:
+    get:
+      operationId: listTrainingGroundsVersions
+      tags: [Agent Versions]
+      summary: Discover training-grounds-eligible opponents
+      description: >
+        Public, cross-team listing for the Training Grounds opponent picker.
+        Only versions with both training_grounds_eligible=true and a
+        registered mcp_endpoint_url are returned — an endpoint-less version
+        isn't dialable and so isn't a legal opponent regardless of its
+        eligibility flag. training_grounds_eligible=true is currently the
+        only accepted value for the query parameter.
+      security: []
+      parameters:
+        - name: training_grounds_eligible
+          in: query
+          required: true
+          schema: { type: string, enum: ["true"] }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrainingGroundsVersionList"
+        "400": { $ref: "#/components/responses/BadRequest" }
 
   /agent-versions/{id}:
     get:
@@ -400,6 +591,26 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: deleteAgentVersion
+      tags: [Agent Versions]
+      summary: Delete a single agent version that has never been used
+      description: >
+        Refuses with 409 if the version has any matches row at all — training
+        or competition, regardless of status. The parent agent and its other
+        versions are unaffected.
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Agent version has match history; delete is not supported
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
 
   /agent-versions/{id}/rotate-key:
     post:
@@ -453,6 +664,43 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MatchList"
+    post:
+      operationId: launchMatch
+      tags: [Matches]
+      summary: Launch a Training Grounds match
+      description: >
+        Starts a match in-process immediately — there is no "pending" state,
+        so a successful response always reports status=running. The acting
+        team is the challenger agent-version's own owning team: a Member may
+        only launch with a version they personally registered, matching the
+        registrant enforcement already applied to agent-version writes. The
+        opponent must be training_grounds_eligible and, like the challenger,
+        must have a registered mcp_endpoint_url. match_type is always forced
+        to "training"; scenario_id is not yet supported and must be omitted.
+      parameters:
+        - $ref: "#/components/parameters/idempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LaunchMatchRequest"
+      responses:
+        "202":
+          description: Accepted — match is running
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MatchLaunched"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502":
+          description: Could not reach the challenger's or opponent's MCP endpoint
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
 
   /matches/{id}:
     get:
@@ -472,24 +720,50 @@ paths:
 
   /matches/{id}/log:
     get:
-      operationId: downloadCommandLog
+      operationId: getMatchLog
       tags: [Command Logs]
-      summary: Download a completed match's command log
+      summary: Get a completed match's command log
       description: >
-        Streamed newline-delimited JSON per
-        playback-and-replay.md#command-log-format-json-lines: one Match
-        Header record, one Impulse record per line, one Outcome record.
+        The command log recorded for this match, as a single JSON document (Match Header, the full
+        Impulse list, and Outcome). This is an interim representation of the format defined in
+        playback-and-replay.md#command-log-format-json-lines; that document's per-record JSON Lines
+        transport (application/x-ndjson, streamed one record per line) is this endpoint's target shape
+        and lands in a later release — see playback-and-replay.md#download-endpoint. 404 if the match
+        does not exist or has no ingested log yet.
+
+        A plain GET (used by the console's replay view) always succeeds regardless of the match's
+        `log_downloadable` flag. Passing `download=1` marks the request as an explicit download rather
+        than replay; for a match with `log_downloadable=false` that variant alone returns 403. This lets
+        one specific match's log be exempted from bulk download without breaking its own replay.
       security: []
       parameters:
         - $ref: "#/components/parameters/id"
+        - name: download
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ["1"]
+          description: >
+            Set to "1" to mark this request as an explicit download. Subject to the match's
+            `log_downloadable` flag; omit for replay, which is never gated by it.
       responses:
         "200":
           description: OK
           content:
-            application/x-ndjson:
+            application/json:
               schema:
-                type: string
-                format: binary
+                type: object
+                description: >
+                  The match's CommandLog document: a Match Header, an ordered Impulse array, and an
+                  Outcome, per playback-and-replay.md#record-schemas.
+        "403":
+          description: >
+            Returned only for a `download=1` request against a match whose `log_downloadable` flag is
+            false.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /leaderboards/official:
@@ -512,6 +786,12 @@ paths:
     get:
       operationId: getUnofficialLeaderboard
       tags: [Leaderboards]
+      summary: Rank agent-versions by soccer-style points per match
+      description: >
+        Ranked by points_per_match — (3*wins + ties) / matches, soccer-style scoring normalized per
+        match — descending. Agent-versions with fewer than 5 matches played are provisional_record:
+        still shown and scored, but sorted below every qualified agent-version. See
+        leaderboard-and-rating.md#unofficial-leaderboard.
       security: []
       parameters:
         - $ref: "#/components/parameters/pageSize"
@@ -522,7 +802,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/LeaderboardPage"
+                $ref: "#/components/schemas/UnofficialLeaderboardPage"
 
   /leaderboards/organizations:
     get:
@@ -560,6 +840,29 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HistoricLeaderboardPage"
+
+  /leaderboards/competitive-organizations:
+    get:
+      operationId: getCompetitiveOrgLeaderboard
+      tags: [Leaderboards]
+      summary: Rank organizations by their strongest roster
+      description: >
+        A synthetic aggregate, distinct from the /leaderboards/organizations projection: each
+        organization's score is the mean rating of its top-3 non-provisional agent-versions (an
+        agent must have shed provisional status by actually competing to count at all). Mean-of-
+        top-3 resists both idle-agent volume-padding and cherry-picking a single standout — see
+        leaderboard-and-rating.md#competitive-organizations.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/pageSize"
+        - $ref: "#/components/parameters/pageToken"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompetitiveOrgPage"
 
   /matches/{id}/disputes:
     post:
@@ -632,6 +935,11 @@ components:
       schema: { type: string }
 
   responses:
+    BadRequest:
+      description: Request is malformed or fails validation
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
     Unauthorized:
       description: Missing or invalid credential
       content:
@@ -665,11 +973,26 @@ components:
 
     Organization:
       type: object
-      required: [id, name, created_at]
+      required: [id, name, created_at, role_weight]
       properties:
         id: { type: string }
         name: { type: string }
         created_at: { type: string, format: date-time }
+        role_weight:
+          type: integer
+          description: >
+            The caller's role weight in this organization (member=3,
+            admin=4, owner=5) — lets a client decide whether to show
+            admin-only views without a second request.
+
+    OrganizationList:
+      type: object
+      required: [items, next_page_token]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Organization" }
+        next_page_token: { type: string }
 
     User:
       type: object
@@ -677,6 +1000,68 @@ components:
       properties:
         id: { type: string }
         created_at: { type: string, format: date-time }
+
+    OrgMember:
+      type: object
+      required: [id, created_at, email, display_name, role_weight]
+      properties:
+        id: { type: string }
+        created_at: { type: string, format: date-time }
+        email: { type: string }
+        display_name: { type: string }
+        role_weight:
+          type: integer
+          description: This member's role weight (member=3, admin=4, owner=5).
+
+    OrgMemberList:
+      type: object
+      required: [items, next_page_token]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/OrgMember" }
+        next_page_token: { type: string }
+
+    PendingInvitation:
+      type: object
+      required:
+        [id, org_id, email, role_weight, status, invited_by, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          description: Clerk's own invitation ID, not an internal gzm_ id.
+        org_id: { type: string }
+        email: { type: string }
+        role_weight:
+          type: integer
+          description: The invited role weight — always 3 (member) or 4 (admin).
+        status:
+          type: string
+          enum: [pending, accepted, revoked]
+        invited_by:
+          type: string
+          description: Internal user id of the org admin/owner who sent the invite.
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    PendingInvitationList:
+      type: object
+      required: [items, next_page_token]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/PendingInvitation" }
+        next_page_token: { type: string }
+
+    SendInvitationRequest:
+      type: object
+      required: [email, role_weight]
+      properties:
+        email: { type: string }
+        role_weight:
+          type: integer
+          enum: [3, 4]
+          description: 3 (member) or 4 (admin) — an invitation can never mint an owner.
 
     CreateTokenRequest:
       type: object
@@ -811,38 +1196,138 @@ components:
       properties:
         id: { type: string, format: uuid }
         agent_id: { type: string, format: uuid }
-        version_label: { type: string }
+        version_label:
+          type: string
+          description: >
+            Server-derived as "v" + generation. Cannot be set by the client.
+        generation:
+          type: integer
+          nullable: true
+          description: >
+            This version's sequence number for its agent, assigned as
+            MAX(generation)+1 at creation — never reused, even if an earlier
+            version is deleted, since match history and ratings still
+            reference it. Nullable only for rows created before this field
+            existed.
+        description:
+          type: string
+          description: >
+            Free-text notes, editable after creation unlike the rest of the
+            version. Console-only: visible to anyone who can see this team,
+            never rendered on the public leaderboard or in match payloads.
+            Do not store secrets here.
         competition_eligible: { type: boolean }
         training_grounds_eligible: { type: boolean }
         mcp_endpoint_url:
           type: string
           format: uri
+          nullable: true
           description: >
-            The agent version's MCP server endpoint. Absent if none has been
-            registered yet.
+            HTTPS URL of this version's MCP server. Required before the
+            version is launch-eligible; absent means it cannot yet be
+            dialed for a match.
         created_at: { type: string, format: date-time }
+        reachability:
+          allOf:
+            - $ref: "#/components/schemas/AgentVersionReachability"
+          nullable: true
+          description: >
+            Matchmaking's probe state for this version. Present on
+            team-scoped responses (get/list agent versions, list team agent
+            versions); always absent on the public training-grounds listing
+            (see TrainingGroundsVersion).
+        stats:
+          allOf:
+            - $ref: "#/components/schemas/AgentVersionStats"
+          nullable: true
+          description: >
+            Training and competition match record, split by type. Present
+            only on the per-agent version listing (listAgentVersions);
+            absent elsewhere, including the public training-grounds listing.
+
+    AgentVersionStats:
+      type: object
+      required: [training, competition]
+      properties:
+        training: { $ref: "#/components/schemas/AgentVersionMatchTally" }
+        competition: { $ref: "#/components/schemas/AgentVersionMatchTally" }
+
+    AgentVersionMatchTally:
+      type: object
+      required: [matches, wins, losses, ties]
+      description: >
+        Counts only status = 'completed' matches, so wins + losses + ties
+        always equals matches.
+      properties:
+        matches: { type: integer }
+        wins: { type: integer }
+        losses: { type: integer }
+        ties: { type: integer }
+
+    AgentVersionReachability:
+      type: object
+      required: [consecutive_probe_failures]
+      properties:
+        consecutive_probe_failures:
+          type: integer
+          description: >
+            Consecutive failed matchmaking probes. Resets to 0 on a
+            successful probe, or when competition_eligible transitions from
+            false to true via UpdateAgentVersionRequest. 3 consecutive
+            failures auto-retires the version (competition_eligible set to
+            false, unreachable_retired_at set).
+        last_probe_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_reachable_at:
+          type: string
+          format: date-time
+          nullable: true
+        unreachable_retired_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: >
+            When matchmaking auto-retired this version after 3 consecutive
+            unreachable probes. Cleared when competition_eligible
+            transitions from false to true.
 
     CreateAgentVersionRequest:
       type: object
-      required: [version_label, mcp_endpoint_url, mcp_outbound_key]
+      required: [mcp_endpoint_url]
       properties:
-        version_label: { type: string }
+        version_label:
+          type: string
+          description: >
+            Server-assigned; do not set. A non-empty value is rejected with
+            400 rather than silently ignored.
+        description:
+          type: string
+          description: Optional free-text notes. See AgentVersion.description.
         mcp_endpoint_url:
           type: string
           format: uri
           description: >
-            HTTPS URL of the agent version's MCP server. Must not embed
-            userinfo, and must not resolve to a loopback, private,
-            link-local, or other non-public host.
+            HTTPS URL of this version's MCP server. Must not embed userinfo,
+            and must not resolve to a loopback, private, link-local, or
+            other non-public host.
         mcp_outbound_key:
           type: string
           maxLength: 512
           writeOnly: true
           description: >
-            Credential the platform presents to this agent version's MCP
-            endpoint when dialing out to referee a match — the mirror image
-            of the api_key an agent presents when calling in. Write-only:
-            never returned by any response, including this one.
+            Secret the platform presents as a bearer token when it dials
+            this version's MCP server to run a match. Write-only: never
+            returned by any endpoint. Mutually exclusive with
+            reuse_previous_outbound_key; exactly one of the two is required.
+        reuse_previous_outbound_key:
+          type: boolean
+          description: >
+            Copy the outbound key from this agent's highest-generation
+            existing version instead of supplying a new one. The secret
+            value is never returned in any response. Mutually exclusive
+            with mcp_outbound_key.
 
     AgentVersionCreated:
       allOf:
@@ -885,6 +1370,77 @@ components:
             Replaces the outbound dial credential if present. Same
             validation as on create; an empty string is rejected, so this
             field cannot be used to clear a previously registered key.
+        description:
+          type: string
+          description: See AgentVersion.description.
+
+    AgentVersionList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AgentVersion" }
+
+    TeamAgentVersion:
+      allOf:
+        - $ref: "#/components/schemas/AgentVersion"
+        - type: object
+          required: [agent_name]
+          properties:
+            agent_name: { type: string }
+
+    TeamAgentVersionList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/TeamAgentVersion" }
+
+    TrainingGroundsVersion:
+      description: >
+        A version from another team's roster, as seen through the public
+        training-grounds listing. reachability (inherited from AgentVersion)
+        is always absent here — matchmaking probe state is internal to the
+        owning team and this endpoint requires no auth.
+      allOf:
+        - $ref: "#/components/schemas/AgentVersion"
+        - type: object
+          required: [agent_name, team_name, org_name]
+          properties:
+            agent_name: { type: string }
+            team_name: { type: string }
+            org_name: { type: string }
+
+    TrainingGroundsVersionList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/TrainingGroundsVersion" }
+
+    LaunchMatchRequest:
+      type: object
+      required: [challenger_agent_version_id, opponent_agent_version_id]
+      properties:
+        challenger_agent_version_id: { type: string, format: uuid }
+        opponent_agent_version_id: { type: string, format: uuid }
+        scenario_id:
+          type: string
+          description: >
+            Not yet supported — omit this field. Reserved for a future
+            scenario registry.
+
+    MatchLaunched:
+      type: object
+      required: [match_id, status]
+      properties:
+        match_id: { type: string, format: uuid }
+        status:
+          type: string
+          description: Always "running" — launch starts the match in-process immediately.
 
     Match:
       type: object
@@ -892,20 +1448,79 @@ components:
         - id
         - agent_version_a
         - agent_version_b
+        - agent_a_id
+        - team_a_id
+        - org_a_id
+        - agent_a_name
+        - team_a_name
+        - org_a_name
+        - agent_b_id
+        - team_b_id
+        - org_b_id
+        - agent_b_name
+        - team_b_name
+        - org_b_name
         - match_type
         - status
         - created_at
+        - log_downloadable
       properties:
         id: { type: string, format: uuid }
         agent_version_a: { type: string, format: uuid }
         agent_version_b: { type: string, format: uuid }
+        agent_a_id:
+          type: string
+          format: uuid
+          description: >-
+            agents.id for side A — the value the agent_id query filter compares against, not the
+            agent-version id above. Enables click-to-filter UIs without a separate name-search endpoint.
+        team_a_id: { type: string, format: uuid, description: teams.id for side A; the team_id filter value. }
+        org_a_id: { type: string, description: teams.org_id for side A (TEXT); the org_id filter value. }
+        agent_a_name: { type: string }
+        agent_a_version_label: { type: string }
+        team_a_name: { type: string }
+        org_a_name: { type: string }
+        agent_b_id: { type: string, format: uuid, description: agents.id for side B. }
+        team_b_id: { type: string, format: uuid, description: teams.id for side B. }
+        org_b_id: { type: string, description: teams.org_id for side B (TEXT). }
+        agent_b_name: { type: string }
+        agent_b_version_label: { type: string }
+        team_b_name: { type: string }
+        org_b_name: { type: string }
         match_type: { type: string }
         status: { type: string }
         winner_agent_version_id:
           type: string
           format: uuid
           nullable: true
+        winner_name:
+          type: string
+          nullable: true
+          description: Display name of the winning side's agent, or null for a tie/in-progress match.
         created_at: { type: string, format: date-time }
+        started_at: { type: string, format: date-time, nullable: true }
+        ended_at: { type: string, format: date-time, nullable: true }
+        impulses:
+          type: integer
+          nullable: true
+          description: Number of impulses played, once the match has ended.
+        log_downloadable:
+          type: boolean
+          description: Whether the full command log may be downloaded, vs. replay-only.
+        agent_a_rank:
+          type: integer
+          nullable: true
+          description: Side A's current leaderboard rank, if rated.
+        agent_b_rank:
+          type: integer
+          nullable: true
+          description: Side B's current leaderboard rank, if rated.
+        outcome_reason:
+          type: string
+          nullable: true
+          description: >-
+            Win-condition code from the referee (e.g. blockhouse_destroyed, tanks_eliminated,
+            surrender, forfeit, turn_limit), null until the match completes.
 
     MatchList:
       type: object
@@ -918,10 +1533,25 @@ components:
 
     LeaderboardEntry:
       type: object
-      required: [rank, agent_version_id, rating, rating_deviation, provisional]
+      required:
+        [
+          rank,
+          agent_version_id,
+          agent_name,
+          agent_version_label,
+          team_name,
+          org_name,
+          rating,
+          rating_deviation,
+          provisional,
+        ]
       properties:
         rank: { type: integer }
         agent_version_id: { type: string, format: uuid }
+        agent_name: { type: string }
+        agent_version_label: { type: string }
+        team_name: { type: string }
+        org_name: { type: string }
         rating:
           type: number
           description: Glicko-2 rating (r). Default for a new agent-version is 1500.
@@ -964,6 +1594,61 @@ components:
         items:
           type: array
           items: { $ref: "#/components/schemas/HistoricLeaderboardEntry" }
+        next_page_token: { type: string }
+
+    UnofficialLeaderboardEntry:
+      allOf:
+        - $ref: "#/components/schemas/LeaderboardEntry"
+        - type: object
+          required: [wins, losses, ties, win_rate, points_per_match, provisional_record]
+          properties:
+            wins: { type: integer }
+            losses: { type: integer }
+            ties: { type: integer }
+            win_rate:
+              type: number
+              description: wins / (wins + losses + ties); 0 when no matches have been played.
+            points_per_match:
+              type: number
+              description: >-
+                (3*wins + ties) / (wins + losses + ties), the ranking key for this board; 0 when no
+                matches have been played. Ranges from 0 to 3.
+            provisional_record:
+              type: boolean
+              description: >-
+                True when fewer than 5 matches have been played — ranked below all qualified
+                agent-versions, but still shown and scored.
+
+    UnofficialLeaderboardPage:
+      type: object
+      required: [items, next_page_token]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/UnofficialLeaderboardEntry" }
+        next_page_token: { type: string }
+
+    CompetitiveOrgEntry:
+      type: object
+      required: [rank, org_id, org_name, rated_agent_count, score]
+      properties:
+        rank: { type: integer }
+        org_id: { type: string }
+        org_name: { type: string }
+        rated_agent_count:
+          type: integer
+          description: Count of this org's non-provisional (actually-competed) agent-versions.
+        score:
+          type: number
+          description: Mean Glicko-2 rating of the org's top-3 non-provisional agent-versions.
+
+    CompetitiveOrgPage:
+      type: object
+      required: [items, next_page_token]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/CompetitiveOrgEntry" }
         next_page_token: { type: string }
 
     Dispute:
